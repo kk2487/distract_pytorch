@@ -1,3 +1,6 @@
+import math
+import utils
+
 def get_num(point_dict, name, axis):
 	num = point_dict.get(f'{name}')[axis]
 	num = float(num)
@@ -53,3 +56,30 @@ def point_point(point_1,point_2):
 	y2 = point_2[1]
 	distance = ((x1-x2)**2 +(y1-y2)**2)**0.5
 	return distance
+
+def find_pose(point_dict):
+	#yaw
+		point1 = [get_num(point_dict, 1, 0), get_num(point_dict, 1, 1)]
+		point31 = [get_num(point_dict, 31, 0), get_num(point_dict, 31, 1)]
+		point51 = [get_num(point_dict, 51, 0), get_num(point_dict, 51, 1)]
+		crossover51 = point_line(point51, [point1[0], point1[1], point31[0], point31[1]])
+		yaw_mean = point_point(point1, point31) / 2
+		yaw_right = point_point(point1, crossover51)
+		yaw = (yaw_mean - yaw_right) / yaw_mean
+		yaw = int(yaw * 71.58 + 0.7037) + 30
+
+		#pitch
+		pitch_dis = point_point(point51, crossover51)
+		if point51[1] < crossover51[1]:
+			pitch_dis = -pitch_dis
+		pitch = int(1.497 * pitch_dis + 18.97) -10
+
+		#roll
+		roll_tan = abs(get_num(point_dict,60,1) - get_num(point_dict,72,1)) / abs(get_num(point_dict,60,0) - get_num(point_dict,72,0))
+		roll = math.atan(roll_tan)
+		roll = math.degrees(roll)
+		if get_num(point_dict, 60, 1) > get_num(point_dict, 72, 1):
+			roll = -roll
+		roll = int(roll)
+
+		return yaw, pitch, roll

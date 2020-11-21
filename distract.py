@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import warnings
 import numpy as np
 from PIL import Image
 import torch
@@ -15,19 +16,12 @@ import cv2
 import utils
 import CNN as cnn
 from FacePose_pytorch.dectect import AntiSpoofPredict
+from FacePose_pytorch.pfld.pfld import PFLDInference, AuxiliaryNet	
+from FacePose_pytorch.compute import find_pose
+warnings.filterwarnings('ignore')
 
-def get_num(point_dict, name, axis):
-	num = point_dict.get(f'{name}')[axis]
-	num = float(num)
-	return num
 
-# for distract model
-def get_num(point_dict, name, axis):
-	num = point_dict.get(f'{name}')[axis]
-	num = float(num)
-	return num
-	
-transformer=transforms.Compose([
+distract_transformer=transforms.Compose([
 	transforms.Resize((256,256)),
 	transforms.RandomHorizontalFlip(),
 	transforms.ToTensor(),  #0-255 to 0-1, numpy to tensors
@@ -35,9 +29,10 @@ transformer=transforms.Compose([
 						[0.229,0.224,0.255])
 ])
 # for headpose model
-transform = transforms.Compose([transforms.ToTensor()])
-classes = cnn.read_classes('classes.txt')
 
+classes = cnn.read_classes('classes.txt')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+headpose_model = './FacePose_pytorch/checkpoint/snapshot/checkpoint.pth.tar'
 def prediction(img, transformer, model):
 	
 	image_tensor=transformer(img).float()
@@ -78,14 +73,22 @@ def crop_range(x1, x2, y1, y2, w, h):
 	return x1, x2, y1, y2, dx, dy, edx, edy
 
 if __name__ == '__main__':
-	
-	fileUrl = './test5.mp4'
+
+	checkpoint = torch.load(headpose_model, map_location=device)
+	plfd_backbone = PFLDInference().to(device)
+	plfd_backbone.load_state_dict(checkpoint['plfd_backbone'])
+	plfd_backbone.eval()
+	plfd_backbone = plfd_backbone.to(device)
+	headpose_transformer = transforms.Compose([transforms.ToTensor()])
+
+	#fileUrl = './test5.mp4'
+	fileUrl = 'D:/rgb/normal_2.mp4'
 	font = cv2.FONT_HERSHEY_SIMPLEX
 
 	cap = cv2.VideoCapture(fileUrl)
 	ret, frame = cap.read()
 	height, width = frame.shape[:2]
-	
+
 	model = cnn.load_model()
 
 	face_model = AntiSpoofPredict(0)
@@ -97,6 +100,8 @@ if __name__ == '__main__':
 		ret, frame = cap.read()
 		frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
 		draw_mat = frame.copy()
+
+		# 尋找臉部範圍資訊
 		image_bbox = face_model.get_bbox(frame)
 		face_x1 = image_bbox[0]
 		face_y1 = image_bbox[1]
@@ -110,22 +115,50 @@ if __name__ == '__main__':
 		cropped = frame[int(crop_y1):int(crop_y2), int(crop_x1):int(crop_x2)]
 		if (dx > 0 or dy > 0 or edx > 0 or edy > 0):
 			cropped = cv2.copyMakeBorder(cropped, int(dy), int(edy), int(dx), int(edx), cv2.BORDER_CONSTANT, 0)
-		
+		ratio_w = face_w / 112
+		ratio_h = face_h / 112
+
 		cropped = cv2.resize(cropped, (112, 112))
+		face_input = cropped.copy()
+		face_input = cv2.cvtColor(face_input, cv2.COLOR_BGR2RGB)
+		face_input = headpose_transformer(face_input).unsqueeze(0).to(device)
+
+		#尋找特徵點
+		_, landmarks = plfd_backbone(face_input)
+		pre_landmark = landmarks[0]
+		pre_landmark = pre_landmark.cpu().detach().numpy().reshape(-1, 2) * [112, 112]
+		point_dict = {}
+		i = 0
+		for (x,y) in pre_landmark.astype(np.float32):
+			point_dict[f'{i}'] = [x,y]
+			cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
+			i += 1
+
+		#計算各軸角度
+		yaw, pitch, roll = find_pose(point_dict)
 
 
+		cv2.putText(draw_mat,f"Head_Yaw: {yaw}",(500,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(0,255,0),2)
+		cv2.putText(draw_mat,f"Head_Pitch: {pitch}",(500,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(0,255,0),2)
+		cv2.putText(draw_mat,f"Head_Roll: {roll}",(500,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(0,255,0),2)
+
+		
+		# 分心偵測部分
+
+		# 框出臉部位置
 		cv2.rectangle(draw_mat, (face_x1, face_y1), (face_x2, face_y2), (255, 0, 255), 2, cv2.LINE_AA) 
 		pre_src = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 		pre_src = cv2.resize(pre_src,(256,256))
 		img=Image.fromarray(np.uint8(pre_src))
-		output=prediction(img, transformer, model)
+		output=prediction(img, distract_transformer, model)
 		end = time.time()
-
 		cv2.putText(draw_mat,output,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 		cv2.putText(draw_mat,str(int(1/(end-start))),(15,100), font, 1.4,(0,0,255),3,cv2.LINE_AA)
-		#frame = cv2.resize(frame,(360,640))
+
+		#cropped = cv2.resize(cropped, (360, 360))
+		draw_mat = cv2.resize(draw_mat,(360,640))
 		cv2.imshow("draw_mat", draw_mat)
-		cv2.imshow("cropped", cropped)
+		#cv2.imshow("cropped", cropped)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			cap.release()
 			cv2.destroyAllWindows()
