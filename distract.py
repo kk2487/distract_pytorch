@@ -71,6 +71,33 @@ def crop_range(x1, x2, y1, y2, w, h):
 	x2 = min(width, x2)
 	y2 = min(height, y2)
 	return x1, x2, y1, y2, dx, dy, edx, edy
+def headpose_status(yaw, pitch, roll):
+	up_down = ''
+	left_right = ''
+	tilt = ''
+
+	if(yaw > utils.H_R):
+		left_right = 'right'
+	elif(yaw < utils.H_L):
+		left_right = 'left'
+	else:
+		left_right = 'normal'
+
+	if(pitch > utils.H_D):
+		up_down = 'down'
+	elif(pitch < utils.H_U):
+		up_down = 'up'
+	else:
+		up_down = 'normal'
+
+	if(roll > utils.T_L):
+		tilt = 'left'
+	elif(roll < utils.T_R):
+		tilt = 'right'
+	else:
+		tilt = 'normal'
+
+	return left_right, up_down, tilt
 
 if __name__ == '__main__':
 
@@ -81,8 +108,8 @@ if __name__ == '__main__':
 	plfd_backbone = plfd_backbone.to(device)
 	headpose_transformer = transforms.Compose([transforms.ToTensor()])
 
-	#fileUrl = './test5.mp4'
-	fileUrl = 'D:/rgb/normal_2.mp4'
+	fileUrl = './test5.mp4'
+	#fileUrl = 'D:/rgb/normal_2.mp4'
 	font = cv2.FONT_HERSHEY_SIMPLEX
 
 	cap = cv2.VideoCapture(fileUrl)
@@ -136,12 +163,15 @@ if __name__ == '__main__':
 
 		#計算各軸角度
 		yaw, pitch, roll = find_pose(point_dict)
+		left_right, up_down, tilt = headpose_status(yaw, pitch, roll)
 
+		#cv2.putText(draw_mat,f"Head_Yaw: {yaw}",(200,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		#cv2.putText(draw_mat,f"Head_Pitch: {pitch}",(200,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		#cv2.putText(draw_mat,f"Head_Roll: {roll}",(200,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
 
-		cv2.putText(draw_mat,f"Head_Yaw: {yaw}",(500,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(0,255,0),2)
-		cv2.putText(draw_mat,f"Head_Pitch: {pitch}",(500,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(0,255,0),2)
-		cv2.putText(draw_mat,f"Head_Roll: {roll}",(500,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(0,255,0),2)
-
+		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right} ({yaw})",(300,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,f"UP_DOWN: {up_down} ({pitch})",(300,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,f"TILT: {tilt} ({roll})",(300,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
 		
 		# 分心偵測部分
 
