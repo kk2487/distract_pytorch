@@ -21,13 +21,7 @@ from FacePose_pytorch.compute import find_pose
 warnings.filterwarnings('ignore')
 
 
-distract_transformer=transforms.Compose([
-	transforms.Resize((256,256)),
-	transforms.RandomHorizontalFlip(),
-	transforms.ToTensor(),  #0-255 to 0-1, numpy to tensors
-	transforms.Normalize([0.485,0.456,0.406], # 0-1 to [-1,1] , formula (x-mean)/std
-						[0.229,0.224,0.255])
-])
+
 # for headpose model
 
 classes = cnn.read_classes('classes.txt')
@@ -101,12 +95,28 @@ def headpose_status(yaw, pitch, roll):
 
 if __name__ == '__main__':
 
-	checkpoint = torch.load(headpose_model, map_location=device)
+	#model for face detect
+	face_model = AntiSpoofPredict(0)
+
+	#model for landmarks
+	checkpoint_h = torch.load(headpose_model, map_location=device)
 	plfd_backbone = PFLDInference().to(device)
-	plfd_backbone.load_state_dict(checkpoint['plfd_backbone'])
+	plfd_backbone.load_state_dict(checkpoint_h['plfd_backbone'])
 	plfd_backbone.eval()
 	plfd_backbone = plfd_backbone.to(device)
 	headpose_transformer = transforms.Compose([transforms.ToTensor()])
+
+	#model for distract 
+	checkpoint_d=torch.load(utils.model_path)
+	model=cnn.ConvNet(num_classes=6).to(device)
+	model.load_state_dict(checkpoint_d)
+	model.eval()
+	distract_transformer=transforms.Compose([
+	transforms.RandomHorizontalFlip(),
+	transforms.ToTensor(),  #0-255 to 0-1, numpy to tensors
+	transforms.Normalize([0.485,0.456,0.406], # 0-1 to [-1,1] , formula (x-mean)/std
+						[0.229,0.224,0.255])
+	])
 
 	fileUrl = './test5.mp4'
 	#fileUrl = 'D:/rgb/normal_2.mp4'
@@ -114,21 +124,23 @@ if __name__ == '__main__':
 
 	cap = cv2.VideoCapture(fileUrl)
 	ret, frame = cap.read()
+	frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
 	height, width = frame.shape[:2]
 
-	model = cnn.load_model()
+	fps = cap.get(cv2.CAP_PROP_FPS)
+	videoWriter = cv2.VideoWriter("./result.avi",cv2.VideoWriter_fourcc('X','V','I','D'),fps,(width,height))
 
-	face_model = AntiSpoofPredict(0)
+	while(ret):
 
-	while(cap.isOpened()):
-
-		
-		start = time.time()
+		f_start = time.time()
 		ret, frame = cap.read()
+		if(not ret):
+			break
 		frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
 		draw_mat = frame.copy()
 
 		# 尋找臉部範圍資訊
+		start = time.time()
 		image_bbox = face_model.get_bbox(frame)
 		face_x1 = image_bbox[0]
 		face_y1 = image_bbox[1]
@@ -136,7 +148,10 @@ if __name__ == '__main__':
 		face_y2 = image_bbox[1] + image_bbox[3]
 		face_w = face_x2 - face_x1
 		face_h = face_y2 - face_y1
+		f_end = time.time()
 
+		#尋找特徵點
+		l_start = time.time()
 		crop_x1, crop_x2, crop_y1, crop_y2, dx, dy, edx, edy = crop_range(face_x1, face_x2, face_y1, face_y2, face_w, face_h)
 		
 		cropped = frame[int(crop_y1):int(crop_y2), int(crop_x1):int(crop_x2)]
@@ -150,46 +165,60 @@ if __name__ == '__main__':
 		face_input = cv2.cvtColor(face_input, cv2.COLOR_BGR2RGB)
 		face_input = headpose_transformer(face_input).unsqueeze(0).to(device)
 
-		#尋找特徵點
 		_, landmarks = plfd_backbone(face_input)
 		pre_landmark = landmarks[0]
 		pre_landmark = pre_landmark.cpu().detach().numpy().reshape(-1, 2) * [112, 112]
+		l_end = time.time()
+
+		#頭部姿態
+		h_start = time.time()
 		point_dict = {}
 		i = 0
 		for (x,y) in pre_landmark.astype(np.float32):
 			point_dict[f'{i}'] = [x,y]
-			cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
+			#cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
 			i += 1
 
 		#計算各軸角度
 		yaw, pitch, roll = find_pose(point_dict)
 		left_right, up_down, tilt = headpose_status(yaw, pitch, roll)
 
-		#cv2.putText(draw_mat,f"Head_Yaw: {yaw}",(200,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		#cv2.putText(draw_mat,f"Head_Pitch: {pitch}",(200,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		#cv2.putText(draw_mat,f"Head_Roll: {roll}",(200,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-
-		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right} ({yaw})",(300,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		cv2.putText(draw_mat,f"UP_DOWN: {up_down} ({pitch})",(300,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		cv2.putText(draw_mat,f"TILT: {tilt} ({roll})",(300,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		
+		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right} ({yaw})",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,f"UP_DOWN: {up_down} ({pitch})",(280,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,f"TILT: {tilt} ({roll})",(280,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		h_end = time.time()
 		# 分心偵測部分
-
+		d_start = time.time()
 		# 框出臉部位置
 		cv2.rectangle(draw_mat, (face_x1, face_y1), (face_x2, face_y2), (255, 0, 255), 2, cv2.LINE_AA) 
 		pre_src = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
 		pre_src = cv2.resize(pre_src,(256,256))
 		img=Image.fromarray(np.uint8(pre_src))
-		output=prediction(img, distract_transformer, model)
+		img = distract_transformer(img).unsqueeze(0).to(device)
+		
+		out=model(img)
+		output=classes[out.argmax()]
+
+		d_end = time.time()
 		end = time.time()
 		cv2.putText(draw_mat,output,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 		cv2.putText(draw_mat,str(int(1/(end-start))),(15,100), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 
 		#cropped = cv2.resize(cropped, (360, 360))
-		draw_mat = cv2.resize(draw_mat,(360,640))
+		#draw_mat = cv2.resize(draw_mat,(360,640))
 		cv2.imshow("draw_mat", draw_mat)
+		print("total : ", end - start, int(1/( end - start)))
+		print("face_detect : ", f_end - f_start)
+		print("landmarks_detect : ", l_end - l_start)
+		print("headpose_detect : ", h_end - h_start)
+		print("distract_detect : ", d_end - d_start)
+		print("------------------------------------")
+
+		#videoWriter.write(draw_mat)
 		#cv2.imshow("cropped", cropped)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			cap.release()
 			cv2.destroyAllWindows()
 			break
+	videoWriter.release()
+	cap.release()
