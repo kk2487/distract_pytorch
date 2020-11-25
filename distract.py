@@ -4,6 +4,10 @@ import time
 import warnings
 import numpy as np
 from PIL import Image
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+import PyQt5.QtGui as QtGui
+from PyQt5.QtCore import *
 import torch
 import glob
 import torch.nn as nn
@@ -93,8 +97,23 @@ def headpose_status(yaw, pitch, roll):
 
 	return left_right, up_down, tilt
 
+class Qt(QWidget):
+    def mv_Chooser(self):    
+        opt = QFileDialog.Options()
+        opt |= QFileDialog.DontUseNativeDialog
+        fileUrl = QFileDialog.getOpenFileName(self,"Input Video", "./","Mp4 (*.mp4)", options=opt)
+	
+        return fileUrl[0]
+
 if __name__ == '__main__':
 
+	qt_env = QApplication(sys.argv)
+	process = Qt()
+	fileUrl = process.mv_Chooser()
+	print(fileUrl)
+	if(fileUrl == ""):
+		print("Without input file!!")
+		sys.exit(0)
 	#model for face detect
 	face_model = AntiSpoofPredict(0)
 
@@ -118,8 +137,7 @@ if __name__ == '__main__':
 						[0.229,0.224,0.255])
 	])
 
-	fileUrl = './test5.mp4'
-	#fileUrl = 'D:/rgb/normal_2.mp4'
+
 	font = cv2.FONT_HERSHEY_SIMPLEX
 
 	cap = cv2.VideoCapture(fileUrl)
@@ -176,7 +194,7 @@ if __name__ == '__main__':
 		i = 0
 		for (x,y) in pre_landmark.astype(np.float32):
 			point_dict[f'{i}'] = [x,y]
-			#cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
+			cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
 			i += 1
 
 		#計算各軸角度
@@ -214,7 +232,7 @@ if __name__ == '__main__':
 		print("distract_detect : ", d_end - d_start)
 		print("------------------------------------")
 
-		#videoWriter.write(draw_mat)
+		videoWriter.write(draw_mat)
 		#cv2.imshow("cropped", cropped)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			cap.release()
