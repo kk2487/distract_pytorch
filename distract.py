@@ -97,6 +97,75 @@ def headpose_status(yaw, pitch, roll):
 
 	return left_right, up_down, tilt
 
+count = 0
+
+yaw_sum = np.zeros(3)
+yaw_count = np.zeros(3)
+pitch_sum = np.zeros(3)
+pitch_count = np.zeros(3)
+roll_sum = np.zeros(3)
+roll_count = np.zeros(3)
+
+deg_past = np.zeros(3)
+
+def headpose_series(yaw, pitch, roll):
+
+	global yaw_sum, yaw_count, pitch_sum, pitch_count, roll_sum, roll_count
+	if(abs(yaw - deg_past[0])<12):
+		#yaw
+		if(yaw>utils.H_R and (yaw - deg_past[0]) > 5):
+			yaw_sum[0] = yaw_sum[0] + yaw
+			yaw_count[0] = yaw_count[0] +1
+		elif(yaw<utils.H_L and (yaw - deg_past[0]) < -5):
+			yaw_sum[2] = yaw_sum[2] + yaw
+			yaw_count[2] = yaw_count[2] +1
+		deg_past[0] = yaw
+	if(abs(pitch - deg_past[1])<12):	
+		#pitch
+		if(pitch>utils.H_D and (pitch - deg_past[1]) > 5):
+			pitch_sum[0] = pitch_sum[0] + yaw
+			pitch_count[0] = pitch_count[0] +1
+		elif(pitch<utils.H_U and (pitch - deg_past[1]) < -5):
+			pitch_sum[2] = pitch_sum[2] + yaw
+			pitch_count[2] = pitch_count[2] +1
+		deg_past[1] = pitch
+	if(abs(roll - deg_past[2])<12):
+		#roll
+		if(roll>utils.H_D and (roll - deg_past[2]) > 5):
+			roll_sum[0] = roll_sum[0] + yaw
+			roll_count[0] = roll_count[0] +1
+		elif(roll<utils.H_U and (roll - deg_past[2]) < -5):
+			roll_sum[2] = roll_sum[2] + yaw
+			roll_count[2] = roll_count[2] +1
+		deg_past[2] = pitch
+
+def headpose_output():
+	left_right = ''
+	up_down = ''
+	tilt = ''
+	if(yaw_count[0] > yaw_count[2] and yaw_sum[0]/yaw_count[0] >15):
+		left_right = "right"
+	elif(yaw_count[0] < yaw_count[2] and yaw_sum[2]/yaw_count[2] < -15):
+		left_right = "left"
+	else:
+		left_right = "normal"
+
+	if(pitch_count[0] > pitch_count[2] and pitch_sum[0]/pitch_count[0] >15):
+		up_down = "down"
+	elif(pitch_count[0] < pitch_count[2] and pitch_sum[2]/pitch_count[2] < -15):
+		up_down = "up"
+	else:
+		up_down = "normal"
+
+	if(roll_count[0] > roll_count[2] and roll_sum[0]/roll_count[0] >15):
+		tilt = "right"
+	elif(roll_count[0] < roll_count[2] and roll_sum[2]/roll_count[2] < -15):
+		tilt = "left"
+	else:
+		tilt = "normal"
+
+	return left_right, up_down, tilt
+
 class Qt(QWidget):
     def mv_Chooser(self):    
         opt = QFileDialog.Options()
@@ -106,7 +175,11 @@ class Qt(QWidget):
         return fileUrl[0]
 
 if __name__ == '__main__':
-
+	left_right = ""
+	up_down = "" 
+	tilt = ""
+	result = ""
+	output_check = np.zeros(len(classes))
 	qt_env = QApplication(sys.argv)
 	process = Qt()
 	fileUrl = process.mv_Chooser()
@@ -147,6 +220,7 @@ if __name__ == '__main__':
 
 	fps = cap.get(cv2.CAP_PROP_FPS)
 	videoWriter = cv2.VideoWriter("./result.avi",cv2.VideoWriter_fourcc('X','V','I','D'),fps,(width,height))
+
 
 	while(ret):
 
@@ -199,11 +273,12 @@ if __name__ == '__main__':
 
 		#計算各軸角度
 		yaw, pitch, roll = find_pose(point_dict)
-		left_right, up_down, tilt = headpose_status(yaw, pitch, roll)
+		#left_right, up_down, tilt = headpose_status(yaw, pitch, roll)
 
-		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right} ({yaw})",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		cv2.putText(draw_mat,f"UP_DOWN: {up_down} ({pitch})",(280,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
-		cv2.putText(draw_mat,f"TILT: {tilt} ({roll})",(280,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		#cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right} ({yaw})",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		#cv2.putText(draw_mat,f"UP_DOWN: {up_down} ({pitch})",(280,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		#cv2.putText(draw_mat,f"TILT: {tilt} ({roll})",(280,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+
 		h_end = time.time()
 		# 分心偵測部分
 		d_start = time.time()
@@ -219,20 +294,42 @@ if __name__ == '__main__':
 
 		d_end = time.time()
 		end = time.time()
-		cv2.putText(draw_mat,output,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
+		#cv2.putText(draw_mat,output,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 		cv2.putText(draw_mat,str(int(1/(end-start))),(15,100), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 
+		if(count < 8):
+			headpose_series(yaw, pitch, roll)
+			output_check[out.argmax()] = output_check[out.argmax()] + 1
+			count = count +1
+			
+		else:
+			left_right, up_down, tilt = headpose_output()
+			count = 0
+			yaw_sum = np.zeros(3)
+			yaw_count = np.zeros(3)
+			pitch_sum = np.zeros(3)
+			pitch_count = np.zeros(3)
+			roll_sum = np.zeros(3)
+			roll_count = np.zeros(3)
+			result = str(classes[output_check.argmax()])
+			output_check = np.zeros(len(classes))
+			
+		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right}",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,f"UP_DOWN: {up_down}",(280,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,f"TILT: {tilt}",(280,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
+		cv2.putText(draw_mat,result,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 		#cropped = cv2.resize(cropped, (360, 360))
 		#draw_mat = cv2.resize(draw_mat,(360,640))
 		cv2.imshow("draw_mat", draw_mat)
+		"""
 		print("total : ", end - start, int(1/( end - start)))
 		print("face_detect : ", f_end - f_start)
 		print("landmarks_detect : ", l_end - l_start)
 		print("headpose_detect : ", h_end - h_start)
 		print("distract_detect : ", d_end - d_start)
 		print("------------------------------------")
-
-		videoWriter.write(draw_mat)
+		"""
+		#videoWriter.write(draw_mat)
 		#cv2.imshow("cropped", cropped)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			cap.release()
