@@ -15,7 +15,7 @@ class Qt(QWidget):
     def mv_Chooser(self):    
         opt = QFileDialog.Options()
         opt |= QFileDialog.DontUseNativeDialog
-        fileUrl = QFileDialog.getOpenFileName(self,"Input Video", "./","Mp4 (*.mp4)", options=opt)
+        fileUrl = QFileDialog.getOpenFileName(self,"Input Video", "D:","Mp4 (*.mp4)", options=opt)
 	
         return fileUrl[0]
 
