@@ -15,7 +15,10 @@ T_R = -10
 
 train_path='/home/hongze/Desktop/dataset/train/'
 validation_path='/home/hongze/Desktop/dataset/validation/'
-
 model_path = './best_checkpoint.model'
 
-training_epochs = 2
+ir_train_path='D:dataset_ir/train/'
+ir_validation_path='D:dataset_ir/validation/'
+ir_model_path = './ir_best_checkpoint.model'
+
+training_epochs = 1
