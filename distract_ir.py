@@ -3,6 +3,7 @@ import sys
 import time
 import warnings
 import numpy as np
+import openpyxl
 from PIL import Image
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -175,6 +176,9 @@ class Qt(QWidget):
         return fileUrl[0]
 
 if __name__ == '__main__':
+	wb =openpyxl.Workbook()
+	sheet = wb['Sheet']
+	index = 1
 	left_right = ""
 	up_down = "" 
 	tilt = ""
@@ -299,13 +303,15 @@ if __name__ == '__main__':
 		end = time.time()
 		#cv2.putText(draw_mat,output,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 		cv2.putText(draw_mat,str(int(1/(end-start))),(15,100), font, 1.4,(0,0,255),3,cv2.LINE_AA)
-
+		file_out = {}
 		if(count < 8):
 			headpose_series(yaw, pitch, roll)
 			output_check[out.argmax()] = output_check[out.argmax()] + 1
 			count = count +1
 			
 		else:
+			file_out = "result_"+str(index)+".jpg"
+			ex_in = 'A'+str(index)
 			left_right, up_down, tilt = headpose_output()
 			count = 0
 			yaw_sum = np.zeros(3)
@@ -316,6 +322,10 @@ if __name__ == '__main__':
 			roll_count = np.zeros(3)
 			result = str(classes[output_check.argmax()])
 			output_check = np.zeros(len(classes))
+			sheet[ex_in] = result
+			wb.save('result.xlsx')
+			#cv2.imwrite(file_out,draw_mat)
+			index = index +1
 			
 		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right}",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
 		cv2.putText(draw_mat,f"UP_DOWN: {up_down}",(280,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)

@@ -17,8 +17,8 @@ train_path='/home/hongze/Desktop/dataset/train/'
 validation_path='/home/hongze/Desktop/dataset/validation/'
 model_path = './best_checkpoint.model'
 
-ir_train_path='D:dataset_ir/train/'
-ir_validation_path='D:dataset_ir/validation/'
+ir_train_path='C:/Users/hongze/Desktop/dataset/train/'
+ir_validation_path='C:/Users/hongze/Desktop/dataset/validation/'
 ir_model_path = './ir_best_checkpoint.model'
 
 training_epochs = 1

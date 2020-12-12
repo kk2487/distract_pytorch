@@ -21,7 +21,7 @@ import utils
 import CNN as cnn
 from FacePose_pytorch.dectect import AntiSpoofPredict
 from FacePose_pytorch.pfld.pfld import PFLDInference, AuxiliaryNet	
-from FacePose_pytorch.compute import find_pose
+from FacePose_pytorch.compute import find_pose, get_num
 warnings.filterwarnings('ignore')
 
 
@@ -69,6 +69,7 @@ def crop_range(x1, x2, y1, y2, w, h):
 	x2 = min(width, x2)
 	y2 = min(height, y2)
 	return x1, x2, y1, y2, dx, dy, edx, edy
+
 def headpose_status(yaw, pitch, roll):
 	up_down = ''
 	left_right = ''
@@ -111,30 +112,30 @@ deg_past = np.zeros(3)
 def headpose_series(yaw, pitch, roll):
 
 	global yaw_sum, yaw_count, pitch_sum, pitch_count, roll_sum, roll_count
-	if(abs(yaw - deg_past[0])<12):
+	if(abs(yaw - deg_past[0])<8):
 		#yaw
-		if(yaw>utils.H_R and (yaw - deg_past[0]) > 5):
+		if(yaw>utils.H_R):
 			yaw_sum[0] = yaw_sum[0] + yaw
 			yaw_count[0] = yaw_count[0] +1
-		elif(yaw<utils.H_L and (yaw - deg_past[0]) < -5):
+		elif(yaw<utils.H_L):
 			yaw_sum[2] = yaw_sum[2] + yaw
 			yaw_count[2] = yaw_count[2] +1
 		deg_past[0] = yaw
-	if(abs(pitch - deg_past[1])<12):	
+	if(abs(pitch - deg_past[1])<8):	
 		#pitch
-		if(pitch>utils.H_D and (pitch - deg_past[1]) > 5):
+		if(pitch>utils.H_D):
 			pitch_sum[0] = pitch_sum[0] + yaw
 			pitch_count[0] = pitch_count[0] +1
-		elif(pitch<utils.H_U and (pitch - deg_past[1]) < -5):
+		elif(pitch<utils.H_U):
 			pitch_sum[2] = pitch_sum[2] + yaw
 			pitch_count[2] = pitch_count[2] +1
 		deg_past[1] = pitch
-	if(abs(roll - deg_past[2])<12):
+	if(abs(roll - deg_past[2])<8):
 		#roll
-		if(roll>utils.H_D and (roll - deg_past[2]) > 5):
+		if(roll>utils.H_D):
 			roll_sum[0] = roll_sum[0] + yaw
 			roll_count[0] = roll_count[0] +1
-		elif(roll<utils.H_U and (roll - deg_past[2]) < -5):
+		elif(roll<utils.H_U):
 			roll_sum[2] = roll_sum[2] + yaw
 			roll_count[2] = roll_count[2] +1
 		deg_past[2] = pitch
@@ -143,28 +144,62 @@ def headpose_output():
 	left_right = ''
 	up_down = ''
 	tilt = ''
-	if(yaw_count[0] > yaw_count[2] and yaw_sum[0]/yaw_count[0] >15):
+	if(yaw_count[0] > yaw_count[2] and yaw_sum[0]/yaw_count[0] >10):
 		left_right = "right"
-	elif(yaw_count[0] < yaw_count[2] and yaw_sum[2]/yaw_count[2] < -15):
+	elif(yaw_count[0] < yaw_count[2] and yaw_sum[2]/yaw_count[2] < -10):
 		left_right = "left"
 	else:
 		left_right = "normal"
 
-	if(pitch_count[0] > pitch_count[2] and pitch_sum[0]/pitch_count[0] >15):
+	if(pitch_count[0] > pitch_count[2] and pitch_sum[0]/pitch_count[0] >10):
 		up_down = "down"
-	elif(pitch_count[0] < pitch_count[2] and pitch_sum[2]/pitch_count[2] < -15):
+	elif(pitch_count[0] < pitch_count[2] and pitch_sum[2]/pitch_count[2] < -10):
 		up_down = "up"
 	else:
 		up_down = "normal"
 
-	if(roll_count[0] > roll_count[2] and roll_sum[0]/roll_count[0] >15):
+	if(roll_count[0] > roll_count[2] and roll_sum[0]/roll_count[0] >10):
 		tilt = "right"
-	elif(roll_count[0] < roll_count[2] and roll_sum[2]/roll_count[2] < -15):
+	elif(roll_count[0] < roll_count[2] and roll_sum[2]/roll_count[2] < -10):
 		tilt = "left"
 	else:
 		tilt = "normal"
 
 	return left_right, up_down, tilt
+
+def dis_head(dis_status, lr, ud, ti):
+	score = 0
+	score_d = 0
+	score_lr = 0
+	score_ud = 0
+	score_ti = 0
+	if(dis_status != 'safe'):
+		score_d = 40
+
+	if(score_lr != 'normal' and (yaw_count[0] > 7 or yaw_count[2] > 7)):
+		score_lr = 40
+	elif(score_lr != 'normal' and (yaw_count[0] > 3 or yaw_count[2] > 3)):
+		score_lr = 30
+	elif(score_lr != 'normal' and (yaw_count[0] > 1 or yaw_count[2] > 1)):
+		score_lr = 10
+
+	if(score_ud != 'normal' and (pitch_count[0] > 7 or pitch_count[2] > 7)):
+		score_ud = 40
+	elif(score_ud != 'normal' and (pitch_count[0] > 3 or pitch_count[2] > 3)):
+		score_ud = 30
+	elif(score_ud != 'normal' and (pitch_count[0] > 1 or pitch_count[2] > 1)):
+		score_ud = 10
+
+	if(score_ti != 'normal' and (roll_count[0] > 7 or roll_count[2] > 7)):
+		score_ti = 30
+	elif(score_ti != 'normal' and (roll_count[0] > 3 or roll_count[2] > 3)):
+		score_ti = 20
+	elif(score_ti != 'normal' and (roll_count[0] > 1 or roll_count[2] > 1)):
+		score_ti = 10
+
+	score = score_d + np.sqrt(score_lr*score_lr + score_ud*score_ud) + score_ti
+	return score
+
 
 class Qt(QWidget):
     def mv_Chooser(self):    
@@ -179,6 +214,7 @@ if __name__ == '__main__':
 	up_down = "" 
 	tilt = ""
 	result = ""
+	distract_score = 0
 	output_check = np.zeros(len(classes))
 	qt_env = QApplication(sys.argv)
 	process = Qt()
@@ -221,9 +257,9 @@ if __name__ == '__main__':
 	fps = cap.get(cv2.CAP_PROP_FPS)
 	videoWriter = cv2.VideoWriter("./result.avi",cv2.VideoWriter_fourcc('X','V','I','D'),fps,(width,height))
 
-
+	n = 0
 	while(ret):
-
+		output_file = "result_"+str(n)+".jpg"
 		f_start = time.time()
 		ret, frame = cap.read()
 		if(not ret):
@@ -268,9 +304,14 @@ if __name__ == '__main__':
 		i = 0
 		for (x,y) in pre_landmark.astype(np.float32):
 			point_dict[f'{i}'] = [x,y]
-			cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
+			#cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
 			i += 1
 
+		cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 1, 0) * ratio_w),int(face_y1 + get_num(point_dict, 1, 1) * ratio_h)), 2, (255, 0, 0), -1)
+		cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 31, 0) * ratio_w),int(face_y1 + get_num(point_dict, 31, 1) * ratio_h)), 2, (255, 0, 0), -1)
+		cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 51, 0) * ratio_w),int(face_y1 + get_num(point_dict, 51, 1) * ratio_h)), 2, (255, 0, 0), -1)
+		#計算各軸角度
+		#計算各軸角度
 		#計算各軸角度
 		yaw, pitch, roll = find_pose(point_dict)
 		#left_right, up_down, tilt = headpose_status(yaw, pitch, roll)
@@ -302,25 +343,35 @@ if __name__ == '__main__':
 			output_check[out.argmax()] = output_check[out.argmax()] + 1
 			count = count +1
 			
+			
 		else:
+			distract_score = 0
 			left_right, up_down, tilt = headpose_output()
 			count = 0
+			result = str(classes[output_check.argmax()])
+			distract_score = dis_head(result, left_right, up_down, tilt)
+			output_check = np.zeros(len(classes))
 			yaw_sum = np.zeros(3)
 			yaw_count = np.zeros(3)
 			pitch_sum = np.zeros(3)
 			pitch_count = np.zeros(3)
 			roll_sum = np.zeros(3)
 			roll_count = np.zeros(3)
-			result = str(classes[output_check.argmax()])
-			output_check = np.zeros(len(classes))
+			
 			
 		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right}",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
 		cv2.putText(draw_mat,f"UP_DOWN: {up_down}",(280,100),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
 		cv2.putText(draw_mat,f"TILT: {tilt}",(280,150),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
 		cv2.putText(draw_mat,result,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
+		if(distract_score >= 30):
+			cv2.putText(draw_mat,"dangerous !!! ",(100,250), font, 2.8,(120,0,255),3,cv2.LINE_AA)
+			
 		#cropped = cv2.resize(cropped, (360, 360))
 		#draw_mat = cv2.resize(draw_mat,(360,640))
 		cv2.imshow("draw_mat", draw_mat)
+		if(n%8 == 0):
+			cv2.imwrite(output_file, draw_mat)
+		n = n+1
 		"""
 		print("total : ", end - start, int(1/( end - start)))
 		print("face_detect : ", f_end - f_start)
@@ -329,9 +380,10 @@ if __name__ == '__main__':
 		print("distract_detect : ", d_end - d_start)
 		print("------------------------------------")
 		"""
-		#videoWriter.write(draw_mat)
+		
+		videoWriter.write(draw_mat)
 		#cv2.imshow("cropped", cropped)
-		if cv2.waitKey(1) & 0xFF == ord('q'):
+		if cv2.waitKey(100) & 0xFF == ord('q'):
 			cap.release()
 			cv2.destroyAllWindows()
 			break
