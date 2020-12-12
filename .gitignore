@@ -5,6 +5,7 @@
 *.avi
 *.jpg
 *.xlsx
+dataset/
 models/
 depth/
 ir/
