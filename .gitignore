@@ -5,6 +5,8 @@
 *.avi
 *.jpg
 *.xlsx
+*.pt
+*.pth
 dataset/
 models/
 depth/
