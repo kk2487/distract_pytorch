@@ -17,7 +17,7 @@ from torch.autograd import Variable
 import torchvision
 import pathlib
 import cv2
-import utils
+import user_set
 import CNN as cnn
 from FacePose_pytorch.dectect import AntiSpoofPredict
 from FacePose_pytorch.pfld.pfld import PFLDInference, AuxiliaryNet	
@@ -25,12 +25,12 @@ from FacePose_pytorch.compute import find_pose, get_num
 warnings.filterwarnings('ignore')
 
 
-
 # for headpose model
 
 classes = cnn.read_classes('classes.txt')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 headpose_model = './FacePose_pytorch/checkpoint/snapshot/checkpoint.pth.tar'
+
 def prediction(img, transformer, model):
 	
 	image_tensor=transformer(img).float()
@@ -51,6 +51,7 @@ def prediction(img, transformer, model):
 	return pred
 
 def crop_range(x1, x2, y1, y2, w, h):
+
 	size = int(max([w, h]))
 	cx = x1 + w/2
 	cy = y1 + h/2
@@ -71,27 +72,28 @@ def crop_range(x1, x2, y1, y2, w, h):
 	return x1, x2, y1, y2, dx, dy, edx, edy
 
 def headpose_status(yaw, pitch, roll):
+
 	up_down = ''
 	left_right = ''
 	tilt = ''
 
-	if(yaw > utils.H_R):
+	if(yaw > user_set.H_R):
 		left_right = 'right'
-	elif(yaw < utils.H_L):
+	elif(yaw < user_set.H_L):
 		left_right = 'left'
 	else:
 		left_right = 'normal'
 
-	if(pitch > utils.H_D):
+	if(pitch > user_set.H_D):
 		up_down = 'down'
-	elif(pitch < utils.H_U):
+	elif(pitch < user_set.H_U):
 		up_down = 'up'
 	else:
 		up_down = 'normal'
 
-	if(roll > utils.T_L):
+	if(roll > user_set.T_L):
 		tilt = 'left'
-	elif(roll < utils.T_R):
+	elif(roll < user_set.T_R):
 		tilt = 'right'
 	else:
 		tilt = 'normal'
@@ -114,33 +116,34 @@ def headpose_series(yaw, pitch, roll):
 	global yaw_sum, yaw_count, pitch_sum, pitch_count, roll_sum, roll_count
 	if(abs(yaw - deg_past[0])<8):
 		#yaw
-		if(yaw>utils.H_R):
+		if(yaw>user_set.H_R):
 			yaw_sum[0] = yaw_sum[0] + yaw
 			yaw_count[0] = yaw_count[0] +1
-		elif(yaw<utils.H_L):
+		elif(yaw<user_set.H_L):
 			yaw_sum[2] = yaw_sum[2] + yaw
 			yaw_count[2] = yaw_count[2] +1
 		deg_past[0] = yaw
 	if(abs(pitch - deg_past[1])<8):	
 		#pitch
-		if(pitch>utils.H_D):
+		if(pitch>user_set.H_D):
 			pitch_sum[0] = pitch_sum[0] + yaw
 			pitch_count[0] = pitch_count[0] +1
-		elif(pitch<utils.H_U):
+		elif(pitch<user_set.H_U):
 			pitch_sum[2] = pitch_sum[2] + yaw
 			pitch_count[2] = pitch_count[2] +1
 		deg_past[1] = pitch
 	if(abs(roll - deg_past[2])<8):
 		#roll
-		if(roll>utils.H_D):
+		if(roll>user_set.H_D):
 			roll_sum[0] = roll_sum[0] + yaw
 			roll_count[0] = roll_count[0] +1
-		elif(roll<utils.H_U):
+		elif(roll<user_set.H_U):
 			roll_sum[2] = roll_sum[2] + yaw
 			roll_count[2] = roll_count[2] +1
 		deg_past[2] = pitch
 
 def headpose_output():
+
 	left_right = ''
 	up_down = ''
 	tilt = ''
@@ -168,6 +171,7 @@ def headpose_output():
 	return left_right, up_down, tilt
 
 def dis_head(dis_status, lr, ud, ti):
+
 	score = 0
 	score_d = 0
 	score_lr = 0
@@ -210,6 +214,7 @@ class Qt(QWidget):
         return fileUrl[0]
 
 if __name__ == '__main__':
+
 	left_right = ""
 	up_down = "" 
 	tilt = ""
@@ -235,7 +240,7 @@ if __name__ == '__main__':
 	headpose_transformer = transforms.Compose([transforms.ToTensor()])
 
 	#model for distract 
-	checkpoint_d=torch.load(utils.model_path)
+	checkpoint_d=torch.load(user_set.model_path)
 	model=cnn.ConvNet(num_classes=6).to(device)
 	model.load_state_dict(checkpoint_d)
 	model.eval()
@@ -258,7 +263,9 @@ if __name__ == '__main__':
 	videoWriter = cv2.VideoWriter("./result.avi",cv2.VideoWriter_fourcc('X','V','I','D'),fps,(width,height))
 
 	n = 0
+
 	while(ret):
+
 		output_file = "result_"+str(n)+".jpg"
 		f_start = time.time()
 		ret, frame = cap.read()
@@ -307,9 +314,9 @@ if __name__ == '__main__':
 			#cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
 			i += 1
 
-		cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 1, 0) * ratio_w),int(face_y1 + get_num(point_dict, 1, 1) * ratio_h)), 2, (255, 0, 0), -1)
-		cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 31, 0) * ratio_w),int(face_y1 + get_num(point_dict, 31, 1) * ratio_h)), 2, (255, 0, 0), -1)
-		cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 51, 0) * ratio_w),int(face_y1 + get_num(point_dict, 51, 1) * ratio_h)), 2, (255, 0, 0), -1)
+		#cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 1, 0) * ratio_w),int(face_y1 + get_num(point_dict, 1, 1) * ratio_h)), 2, (255, 0, 0), -1)
+		#cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 31, 0) * ratio_w),int(face_y1 + get_num(point_dict, 31, 1) * ratio_h)), 2, (255, 0, 0), -1)
+		#cv2.circle(draw_mat,(int(face_x1 + get_num(point_dict, 51, 0) * ratio_w),int(face_y1 + get_num(point_dict, 51, 1) * ratio_h)), 2, (255, 0, 0), -1)
 		#計算各軸角度
 		#計算各軸角度
 		#計算各軸角度
@@ -336,7 +343,7 @@ if __name__ == '__main__':
 		d_end = time.time()
 		end = time.time()
 		#cv2.putText(draw_mat,output,(15,50), font, 1.4,(0,0,255),3,cv2.LINE_AA)
-		cv2.putText(draw_mat,str(int(1/(end-start))),(15,100), font, 1.4,(0,0,255),3,cv2.LINE_AA)
+		#cv2.putText(draw_mat,str(int(1/(end-start))),(15,100), font, 1.4,(0,0,255),3,cv2.LINE_AA)
 
 		if(count < 8):
 			headpose_series(yaw, pitch, roll)
@@ -367,11 +374,14 @@ if __name__ == '__main__':
 			cv2.putText(draw_mat,"dangerous !!! ",(100,250), font, 2.8,(120,0,255),3,cv2.LINE_AA)
 			
 		#cropped = cv2.resize(cropped, (360, 360))
-		#draw_mat = cv2.resize(draw_mat,(360,640))
+		draw_mat = cv2.resize(draw_mat,(360,640))
+
 		cv2.imshow("draw_mat", draw_mat)
-		if(n%8 == 0):
+
+		if(n%4 == 0):
 			cv2.imwrite(output_file, draw_mat)
 		n = n+1
+
 		"""
 		print("total : ", end - start, int(1/( end - start)))
 		print("face_detect : ", f_end - f_start)
@@ -383,9 +393,11 @@ if __name__ == '__main__':
 		
 		videoWriter.write(draw_mat)
 		#cv2.imshow("cropped", cropped)
-		if cv2.waitKey(100) & 0xFF == ord('q'):
+		if cv2.waitKey(1) & 0xFF == ord('q'):
 			cap.release()
 			cv2.destroyAllWindows()
 			break
+
 	videoWriter.release()
+
 	cap.release()

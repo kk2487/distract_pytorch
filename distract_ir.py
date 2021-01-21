@@ -18,7 +18,7 @@ from torch.autograd import Variable
 import torchvision
 import pathlib
 import cv2
-import utils
+import user_set
 import CNN_ir as cnn
 from FacePose_pytorch.dectect import AntiSpoofPredict
 from FacePose_pytorch.pfld.pfld import PFLDInference, AuxiliaryNet	
@@ -75,23 +75,23 @@ def headpose_status(yaw, pitch, roll):
 	left_right = ''
 	tilt = ''
 
-	if(yaw > utils.H_R):
+	if(yaw > user_set.H_R):
 		left_right = 'right'
-	elif(yaw < utils.H_L):
+	elif(yaw < user_set.H_L):
 		left_right = 'left'
 	else:
 		left_right = 'normal'
 
-	if(pitch > utils.H_D):
+	if(pitch > user_set.H_D):
 		up_down = 'down'
-	elif(pitch < utils.H_U):
+	elif(pitch < user_set.H_U):
 		up_down = 'up'
 	else:
 		up_down = 'normal'
 
-	if(roll > utils.T_L):
+	if(roll > user_set.T_L):
 		tilt = 'left'
-	elif(roll < utils.T_R):
+	elif(roll < user_set.T_R):
 		tilt = 'right'
 	else:
 		tilt = 'normal'
@@ -114,28 +114,28 @@ def headpose_series(yaw, pitch, roll):
 	global yaw_sum, yaw_count, pitch_sum, pitch_count, roll_sum, roll_count
 	if(abs(yaw - deg_past[0])<12):
 		#yaw
-		if(yaw>utils.H_R and (yaw - deg_past[0]) > 5):
+		if(yaw>user_set.H_R and (yaw - deg_past[0]) > 5):
 			yaw_sum[0] = yaw_sum[0] + yaw
 			yaw_count[0] = yaw_count[0] +1
-		elif(yaw<utils.H_L and (yaw - deg_past[0]) < -5):
+		elif(yaw<user_set.H_L and (yaw - deg_past[0]) < -5):
 			yaw_sum[2] = yaw_sum[2] + yaw
 			yaw_count[2] = yaw_count[2] +1
 		deg_past[0] = yaw
 	if(abs(pitch - deg_past[1])<12):	
 		#pitch
-		if(pitch>utils.H_D and (pitch - deg_past[1]) > 5):
+		if(pitch>user_set.H_D and (pitch - deg_past[1]) > 5):
 			pitch_sum[0] = pitch_sum[0] + yaw
 			pitch_count[0] = pitch_count[0] +1
-		elif(pitch<utils.H_U and (pitch - deg_past[1]) < -5):
+		elif(pitch<user_set.H_U and (pitch - deg_past[1]) < -5):
 			pitch_sum[2] = pitch_sum[2] + yaw
 			pitch_count[2] = pitch_count[2] +1
 		deg_past[1] = pitch
 	if(abs(roll - deg_past[2])<12):
 		#roll
-		if(roll>utils.H_D and (roll - deg_past[2]) > 5):
+		if(roll>user_set.H_D and (roll - deg_past[2]) > 5):
 			roll_sum[0] = roll_sum[0] + yaw
 			roll_count[0] = roll_count[0] +1
-		elif(roll<utils.H_U and (roll - deg_past[2]) < -5):
+		elif(roll<user_set.H_U and (roll - deg_past[2]) < -5):
 			roll_sum[2] = roll_sum[2] + yaw
 			roll_count[2] = roll_count[2] +1
 		deg_past[2] = pitch
@@ -203,7 +203,7 @@ if __name__ == '__main__':
 	headpose_transformer = transforms.Compose([transforms.ToTensor()])
 
 	#model for distract 
-	checkpoint_d=torch.load(utils.ir_model_path)
+	checkpoint_d=torch.load(user_set.ir_model_path)
 	model=cnn.ConvNet(num_classes=6).to(device)
 	model.load_state_dict(checkpoint_d)
 	model.eval()
@@ -273,7 +273,7 @@ if __name__ == '__main__':
 		i = 0
 		for (x,y) in pre_landmark.astype(np.float32):
 			point_dict[f'{i}'] = [x,y]
-			cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
+			#cv2.circle(draw_mat,(int(face_x1 + x * ratio_w),int(face_y1 + y * ratio_h)), 2, (255, 0, 0), -1)
 			i += 1
 
 		#計算各軸角度
@@ -323,8 +323,8 @@ if __name__ == '__main__':
 			result = str(classes[output_check.argmax()])
 			output_check = np.zeros(len(classes))
 			sheet[ex_in] = result
-			wb.save('result.xlsx')
-			#cv2.imwrite(file_out,draw_mat)
+			#wb.save('result.xlsx')
+			
 			index = index +1
 			
 		cv2.putText(draw_mat,f"LEFT_RIGHT: {left_right}",(280,50),cv2.FONT_HERSHEY_COMPLEX_SMALL,1.3,(0,255,0),2)
@@ -334,6 +334,8 @@ if __name__ == '__main__':
 		#cropped = cv2.resize(cropped, (360, 360))
 		#draw_mat = cv2.resize(draw_mat,(360,640))
 		cv2.imshow("draw_mat", draw_mat)
+		if(file_out != {}):
+			cv2.imwrite(file_out,draw_mat)
 		"""
 		print("total : ", end - start, int(1/( end - start)))
 		print("face_detect : ", f_end - f_start)

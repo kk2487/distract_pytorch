@@ -11,7 +11,7 @@ from torch.autograd import Variable
 import torchvision
 import pathlib
 from tqdm import tqdm
-import utils
+import user_set
 
 transformer=transforms.Compose([
 	transforms.Resize((256,256)),
@@ -114,7 +114,7 @@ class ConvNet(nn.Module):
 		return output
 
 def load_model():
-	checkpoint=torch.load(utils.ir_model_path)
+	checkpoint=torch.load(user_set.ir_model_path)
 	model=ConvNet(num_classes=6)
 	model.load_state_dict(checkpoint)
 	return model
@@ -159,8 +159,8 @@ if __name__ == '__main__':
 
 		#Dataloader
 
-		train_path=utils.ir_train_path
-		validation_path=utils.ir_validation_path
+		train_path=user_set.ir_train_path
+		validation_path=user_set.ir_validation_path
 
 		train_loader=DataLoader(
 			torchvision.datasets.ImageFolder(train_path,transform=transformer),
@@ -183,7 +183,7 @@ if __name__ == '__main__':
 		loss_function=nn.CrossEntropyLoss()
 
 
-		num_epochs = utils.training_epochs
+		num_epochs = user_set.training_epochs
 		#calculating the size of training and testing images
 		
 		train_count=len(glob.glob(train_path+'/**/*.jpg'))
@@ -244,6 +244,6 @@ if __name__ == '__main__':
 			
 			#Save the best model
 			if validation_accuracy>best_accuracy:
-				torch.save(model.state_dict(),utils.ir_model_path)
+				torch.save(model.state_dict(),user_set.ir_model_path)
 				best_accuracy=validation_accuracy
 	

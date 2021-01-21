@@ -20,6 +20,7 @@ class Qt(QWidget):
         return fileUrl[0]
 
 mode = 0
+
 if __name__ == '__main__':
 
 	if(len(sys.argv) < 2):
@@ -44,7 +45,9 @@ if __name__ == '__main__':
 	length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 	ret, frame = cap.read()
+
 	#順時鐘轉90度
+
 	frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE) 
 	height, width = frame.shape[:2]
 	if(os.path.exists('./dataset')):
@@ -52,7 +55,9 @@ if __name__ == '__main__':
 	os.makedirs('./dataset/train')
 	os.makedirs('./dataset/validation')
 	i = 0
+
 	if(mode == 1):
+
 		for i in tqdm(range(length)):
 			gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 			if(random.randint(0,10) == 1):
@@ -64,7 +69,9 @@ if __name__ == '__main__':
 			ret, frame = cap.read()
 			frame = cv2.rotate(frame, cv2.cv2.ROTATE_90_CLOCKWISE)
 			i = i+1
+
 	elif(mode == 2):
+
 		for i in tqdm(range(length)):
 			if(random.randint(0,10) == 1):
 				savefile = "./dataset/validation/"+filename + str(i) + ".jpg"
