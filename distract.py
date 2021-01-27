@@ -126,21 +126,21 @@ def headpose_series(yaw, pitch, roll):
 	if(abs(pitch - deg_past[1])<8):	
 		#pitch
 		if(pitch>user_set.H_D):
-			pitch_sum[0] = pitch_sum[0] + yaw
+			pitch_sum[0] = pitch_sum[0] + pitch
 			pitch_count[0] = pitch_count[0] +1
 		elif(pitch<user_set.H_U):
-			pitch_sum[2] = pitch_sum[2] + yaw
+			pitch_sum[2] = pitch_sum[2] + pitch
 			pitch_count[2] = pitch_count[2] +1
 		deg_past[1] = pitch
 	if(abs(roll - deg_past[2])<8):
 		#roll
-		if(roll>user_set.H_D):
-			roll_sum[0] = roll_sum[0] + yaw
+		if(roll>user_set.T_L):
+			roll_sum[0] = roll_sum[0] + roll
 			roll_count[0] = roll_count[0] +1
-		elif(roll<user_set.H_U):
-			roll_sum[2] = roll_sum[2] + yaw
+		elif(roll<user_set.T_R):
+			roll_sum[2] = roll_sum[2] + roll
 			roll_count[2] = roll_count[2] +1
-		deg_past[2] = pitch
+		deg_past[2] = roll
 
 def headpose_output():
 
@@ -162,9 +162,9 @@ def headpose_output():
 		up_down = "normal"
 
 	if(roll_count[0] > roll_count[2] and roll_sum[0]/roll_count[0] >10):
-		tilt = "right"
-	elif(roll_count[0] < roll_count[2] and roll_sum[2]/roll_count[2] < -10):
 		tilt = "left"
+	elif(roll_count[0] < roll_count[2] and roll_sum[2]/roll_count[2] < -10):
+		tilt = "right"
 	else:
 		tilt = "normal"
 
